@@ -1,0 +1,17 @@
+name: Check my Steam page
+description: Free automated checklist for your Steam store page (Next Fest ready?)
+title: "Page check: "
+labels: ["page-check"]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: Steam store URL or app ID
+      description: e.g. https://store.steampowered.com/app/123456/Your_Game/ (a demo's ID works too)
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        A bot will comment a scored checklist within about a minute. It only reads public Steam store data.
+        Comment `/recheck` after you update your page to run it again.

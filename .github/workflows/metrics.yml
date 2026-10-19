@@ -1,0 +1,16 @@
+name: Keep/kill metrics
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 13 * * *"   # daily, 09:00 ET
+permissions:
+  issues: read
+  contents: read
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 checker/metrics.py >> "$GITHUB_STEP_SUMMARY"

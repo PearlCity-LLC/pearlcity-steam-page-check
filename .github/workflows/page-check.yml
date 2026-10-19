@@ -1,0 +1,43 @@
+name: Steam page check
+on:
+  issues:
+    types: [opened, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+# One check at a time keeps us polite to Steam's public storefront.
+concurrency:
+  group: steam-page-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: >-
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'page-check')) ||
+      (github.event_name == 'issue_comment' && !github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, '/recheck'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run checker
+        env:
+          # Untrusted text is passed via env, never interpolated into the script.
+          COMMENT_TEXT: ${{ github.event.comment.body }}
+          ISSUE_TEXT: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          # "/recheck 123456" checks a new ID; plain "/recheck" re-runs the issue's original ID.
+          python3 checker/steam_check.py --from-text "${COMMENT_TEXT#/recheck} $ISSUE_TEXT $ISSUE_TITLE" > report.md || true
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment report
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file report.md
+          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --add-label checked || true
