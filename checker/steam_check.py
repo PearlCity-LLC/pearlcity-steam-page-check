@@ -104,9 +104,38 @@ def count_languages(s):
     return len(parts), full_audio
 
 
-VAGUE_DATES = re.compile(r"(?i)coming soon|to be announced|tba|tbd|^\d{4}$|^q[1-4]|quarter|^(early|mid|late)|"
-                         r"^(spring|summer|fall|autumn|winter)|^(january|february|march|april|may|june|july|"
-                         r"august|september|october|november|december) \d{4}$")
+MONTHS = r"(january|february|march|april|may|june|july|august|september|october|november|december|" \
+         r"jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\.?"
+
+
+def date_score(date):
+    """Score an unreleased game's shown release date out of 8. More specific scores higher."""
+    t = (date or "").strip().lower()
+    if not t:
+        return 0, "blank"
+    if re.search(r"coming soon|to be announced|\btba\b|\btbd\b", t):
+        return 2, "coming soon / TBA"
+    has_month = re.search(r"\b" + MONTHS + r"(?![a-z])", t)
+    has_day = re.search(r"\b\d{1,2}(st|nd|rd|th)?\b", re.sub(r"\b\d{4}\b", "", t))
+    if has_month and has_day:
+        return 8, "exact date"
+    if has_month:
+        return 7, "month"
+    if re.search(r"\bq[1-4]\b|quarter|spring|summer|fall|autumn|winter|early|mid|late", t):
+        return 5, "season / quarter"
+    if re.fullmatch(r"\d{4}", t):
+        return 4, "year only"
+    return 8, "exact date"
+
+
+def about_tip(words, media):
+    tips = []
+    if words < 200:
+        tips.append(f"Add more description: {words} words is thin; aim for 200+ covering what you do, "
+                    f"the hook and features, under short headers.")
+    if media < 2:
+        tips.append("Break the About section with 2–5 GIFs or images; most visitors skim.")
+    return " ".join(tips)
 
 
 def check(appid):
@@ -195,9 +224,9 @@ def check(appid):
     # 7 release date
     date = (rel.get("date") or "").strip()
     if coming:
-        specific = bool(date) and not VAGUE_DATES.search(date)
-        add("Release date (unreleased)", 8 if specific else 4 if date else 0, 8,
-            f"Shown as “{date or 'blank'}”.",
+        pts, kind = date_score(date)
+        add("Release date (unreleased)", pts, 8,
+            f"Shown as “{date or 'blank'}” ({kind}).",
             "A specific month or date (even an estimate) beats “Coming soon”; it tells wishlisters when to expect you.")
     else:
         add("Release date", 0, None, f"Released: {date or 'unknown'}.")
@@ -244,7 +273,7 @@ def check(appid):
     media = len(re.findall(r"<img|<video", about))
     p = (4 if words >= 200 else 2 if words >= 80 else 0) + (4 if media >= 2 else 2 if media == 1 else 0)
     add("About section (text + GIFs)", p, 8, f"{words} words, {media} inline image/GIF/video(s).",
-        "Break the About section with 2–5 GIFs or images and short headers; most visitors skim.")
+        about_tip(words, media))
 
     # 12 categories / features
     cats = list(dict.fromkeys(c["description"] for c in d.get("categories", [])))
